@@ -2,25 +2,51 @@
 #include <stdlib.h>
 #include <string.h>
 #include <zstd.h>
-#include "common.h"
 
-static void compressFile_orDie(const char* fname, const char* outName, int cLevel,
+/*! CHECK
+ * Check that the condition holds. If it doesn't print a message and die.
+ */
+#define CHECK(cond, ...)                        \
+    do {                                        \
+        if (!(cond)) {                          \
+            fprintf(stderr,                     \
+                    "%s:%d CHECK(%s) failed: ", \
+                    __FILE__,                   \
+                    __LINE__,                   \
+                    #cond);                     \
+            fprintf(stderr, "" __VA_ARGS__);    \
+            fprintf(stderr, "\n");              \
+            exit(1);                            \
+        }                                       \
+    } while (0)
+
+/*! CHECK_ZSTD
+ * Check the zstd error code and die if an error occurred after printing a
+ * message.
+ */
+#define CHECK_ZSTD(fn)                                           \
+    do {                                                         \
+        size_t const err = (fn);                                 \
+        CHECK(!ZSTD_isError(err), "%s", ZSTD_getErrorName(err)); \
+    } while (0)
+
+static void compressFile(const char* fname, const char* outName, int cLevel,
                                int nbThreads)
 {
     fprintf (stderr, "Starting compression of %s with level %d, using %d threads\n",
              fname, cLevel, nbThreads);
 
     /* Open the input and output files. */
-    FILE* const fin  = fopen_orDie(fname, "rb");
-    FILE* const fout = fopen_orDie(outName, "wb");
+    FILE* const fin  = fopen(fname, "rb");
+    FILE* const fout = fopen(outName, "wb");
     /* Create the input and output buffers.
      * They may be any size, but we recommend using these functions to size them.
      * Performance will only suffer significantly for very tiny buffers.
      */
     size_t const buffInSize = ZSTD_CStreamInSize();
-    void*  const buffIn  = malloc_orDie(buffInSize);
+    void*  const buffIn  = malloc(buffInSize);
     size_t const buffOutSize = ZSTD_CStreamOutSize();
-    void*  const buffOut = malloc_orDie(buffOutSize);
+    void*  const buffOut = malloc(buffOutSize);
 
     /* Create the context. */
     ZSTD_CCtx* const cctx = ZSTD_createCCtx();
@@ -38,7 +64,7 @@ static void compressFile_orDie(const char* fname, const char* outName, int cLeve
      */
     size_t const toRead = buffInSize;
     for (;;) {
-        size_t read = fread_orDie(buffIn, toRead, fin);
+        size_t read = fread(buffIn, 1, toRead, fin);
         /* Select the flush mode.
          * If the read may not be finished (read == toRead) we use
          * ZSTD_e_continue. If this is the last chunk, we use ZSTD_e_end.
@@ -60,7 +86,9 @@ static void compressFile_orDie(const char* fname, const char* outName, int cLeve
             ZSTD_outBuffer output = { buffOut, buffOutSize, 0 };
             size_t const remaining = ZSTD_compressStream2(cctx, &output , &input, mode);
             CHECK_ZSTD(remaining);
-            fwrite_orDie(buffOut, output.pos, fout);
+            size_t const writtenSize = fwrite(buffOut, 1, output.pos, fout);
+            //if (writtenSize == sizeToWrite) return sizeToWrite;   /* good */
+
             /* If we're on the last chunk we're finished when zstd returns 0,
              * which means its consumed all the input AND finished the frame.
              * Otherwise, we're finished when we've consumed all the input.
@@ -76,22 +104,10 @@ static void compressFile_orDie(const char* fname, const char* outName, int cLeve
     }
 
     ZSTD_freeCCtx(cctx);
-    fclose_orDie(fout);
-    fclose_orDie(fin);
+    fclose(fout);
+    fclose(fin);
     free(buffIn);
     free(buffOut);
-}
-
-
-static char* createOutFilename_orDie(const char* filename)
-{
-    size_t const inL = strlen(filename);
-    size_t const outL = inL + 5;
-    char* const outSpace = (char*)malloc_orDie(outL);
-    memset(outSpace, 0, outL);
-    strcat(outSpace, filename);
-    strcat(outSpace, ".zst");
-    return (char*)outSpace;
 }
 
 int main(int argc, const char** argv)
@@ -118,12 +134,18 @@ int main(int argc, const char** argv)
       CHECK(nbThreads != 0, "can't parse THREADS!");
     }
 
-    const char* const inFilename = argv[1];
+    const char* const infileName = argv[1];
+    size_t const infileNameLength = strlen(infileName);
+    size_t const outfileNameLength = infileNameLength + 5;
 
-    char* const outFilename = createOutFilename_orDie(inFilename);
-    compressFile_orDie(inFilename, outFilename, cLevel, nbThreads);
+    char* const outfileName = (char*)malloc(outfileNameLength);
+    memset(outfileName, 0, outfileNameLength);
+    strcat(outfileName, infileName);
+    strcat(outfileName, ".zst");
 
-    free(outFilename);   /* not strictly required, since program execution stops there,
-                          * but some static analyzer may complain otherwise */
+    compressFile(infileName, outfileName, cLevel, nbThreads);
+
+    free(outfileName);
+
     return 0;
 }
