@@ -10,8 +10,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # set startup project for sln files
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
 
-add_subdirectory(zstd/build/cmake/lib)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules)
+
+find_package(zstd)
 
 add_executable(${PROJECT_NAME} main.cpp)
-target_include_directories(${PROJECT_NAME} PRIVATE zstd/lib)
-target_link_libraries(${PROJECT_NAME} zstd)
+
+target_include_directories(${PROJECT_NAME} PRIVATE ${zstd_INCLUDE_DIRS})
+
+target_link_libraries(${PROJECT_NAME} ${zstd_LIBRARIES})
+
+#target_link_directories(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/lib)
