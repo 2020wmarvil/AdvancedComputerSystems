@@ -9,6 +9,7 @@ tr -dc "A-Za-z 0-9" < /dev/urandom | fold -w100|head -n 100000 > bigfile.txt
 #### Building the Project
 ```
 sudo apt install cmake
+cd project1
 mkdir build
 cd build
 cmake ..
@@ -21,6 +22,9 @@ make -j8
 ```
 
 #### Benchmarking Test
+
+These measurements are taken on a 12-core Intel i7-10850H @ 2.70GHz
+
 ```
 ---- L1 Compression ----
 1 Thread:
