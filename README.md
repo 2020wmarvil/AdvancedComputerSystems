@@ -23,7 +23,7 @@ make -j8
 
 #### Benchmarking Test
 
-These measurements are taken on a 12-core Intel i7-10850H @ 2.70GHz
+These measurements are taken on a 12-core Intel i7-10850H @ 2.70GHz, compressing a 10gb file. 
 
 ```
 ---- L1 Compression ----
