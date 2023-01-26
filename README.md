@@ -9,6 +9,7 @@ tr -dc "A-Za-z 0-9" < /dev/urandom | fold -w100|head -n 100000 > bigfile.txt
 #### Building the Project
 ```
 sudo apt install cmake
+cd project1
 mkdir build
 cd build
 cmake ..
