@@ -1,4 +1,4 @@
-# Project2 SIMD Matrix Multiplication
+# Project 2: SIMD Matrix Multiplication
 
 #### Building the Project
 ```
