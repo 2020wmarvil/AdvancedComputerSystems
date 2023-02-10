@@ -1,4 +1,4 @@
-# AdvancedComputerSystems
+# Project 1: Multithreaded Compression
 
 #### Generating a Large Test File
 ```
