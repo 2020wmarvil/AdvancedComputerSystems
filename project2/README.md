@@ -49,10 +49,10 @@ Int64:   0.314862s
 
 - 10,000x10,000, SIMD -
 Float32: 302.742s
-Float64: TODO
-Int16:   TODO
-Int32:   TODO
-Int64:   TODO
+Float64: 347s
+Int16:   266.227s
+Int32:   305.474s
+Int64:   335.092s
 ```
 
 #### Analysis
