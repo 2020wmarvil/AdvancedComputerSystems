@@ -33,8 +33,7 @@
 static void compressFile(const char* fname, const char* outName, int cLevel,
                                int nbThreads)
 {
-    fprintf (stderr, "Starting compression of %s with level %d, using %d threads\n",
-             fname, cLevel, nbThreads);
+    //fprintf (stderr, "Starting compression of %s with level %d, using %d threads\n", fname, cLevel, nbThreads);
 
     /* Open the input and output files. */
     FILE* const fin  = fopen(fname, "rb");

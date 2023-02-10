@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.00)
 
 # set the project name
 project(ACS_Proj1 VERSION 0.0.1.0)
