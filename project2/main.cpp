@@ -13,12 +13,17 @@ struct Matrix
     Matrix(size_t size)
         : size(size)
     {
-        data = (T*)calloc(size * size, sizeof(T));
+        size_t sizeToAlloc = size*size;
+
+        int remainder = sizeToAlloc % 64;
+        if (remainder != 0) sizeToAlloc = sizeToAlloc + 64 - remainder;
+        
+        data = (T*)calloc(sizeToAlloc, sizeof(T));
     }
 
     ~Matrix()
     {
-        //free(data);
+        free(data);
     }
 
     Matrix (const Matrix&) = delete;
@@ -61,7 +66,7 @@ void Mult(const Matrix<T>& mat1, const Matrix<T>& mat2, Matrix<T>& result)
 
 // Reference: https://codereview.stackexchange.com/questions/177616/avx-simd-in-matrix-multiplication
 template<typename T>
-void MultSIMD(const Matrix<T>& mat1, const Matrix<T>& mat2, Matrix<T>& result)
+void MultSIMD_Short(const Matrix<T>& mat1, const Matrix<T>& mat2, Matrix<T>& result)
 {
     size_t N = mat1.size;
     result.size = N;
@@ -69,10 +74,8 @@ void MultSIMD(const Matrix<T>& mat1, const Matrix<T>& mat2, Matrix<T>& result)
     size_t jb = std::min(512u, (uint32_t)N);
     size_t kb = std::min(24u, (uint32_t)N);
     
-    for (size_t jj = 0; jj < N; jj += jb)
-    {
-        for (size_t kk = 0; kk < N; kk += kb)
-        {
+    for (size_t jj = 0; jj < N; jj += jb) {
+        for (size_t kk = 0; kk < N; kk += kb) {
             for (size_t i = 0; i < N; i += 1) {
                 for (size_t j = jj; j < jj + jb; j += 16) {
                     __m256i sumA_1, sumB_1;
@@ -101,6 +104,43 @@ void MultSIMD(const Matrix<T>& mat1, const Matrix<T>& mat2, Matrix<T>& result)
     }
 }
 
+void MultSIMD_Float(const Matrix<float>& mat1, const Matrix<float>& mat2, Matrix<float>& result)
+{
+    size_t N = mat1.size;
+    result.size = N;
+
+    size_t jb = std::min(512u, (uint32_t)N);
+    size_t kb = std::min(24u, (uint32_t)N);
+    
+    for (size_t jj = 0; jj < N; jj += jb) {
+        for (size_t kk = 0; kk < N; kk += kb) {
+            for (size_t i = 0; i < N; i += 1) {
+                for (size_t j = jj; j < jj + jb; j += 16) {
+                    __m256 sumA_1, sumB_1;
+                    if (kk == 0) {
+                        sumA_1 = sumB_1 = _mm256_setzero_ps();
+                    } else {
+                        sumA_1 = _mm256_loadu_ps((float*)&result.data[i*N+j]);
+                        sumB_1 = _mm256_loadu_ps((float*)&result.data[i*N+j + 8]);
+                    }
+
+                    size_t limit = std::min((uint32_t)N, (uint32_t)(kk + kb));
+                    for (size_t k = kk; k < limit; k++) {
+                        auto bc_mat1_1 = _mm256_set1_ps(mat1.data[i*N+k]);
+                        auto vecA_mat2 = _mm256_loadu_ps((float*)&mat2.data[k*N+j]);
+                        auto vecB_mat2 = _mm256_loadu_ps((float*)&mat2.data[k*N+j + 8]);
+                        sumA_1 = _mm256_add_ps(sumA_1, _mm256_mul_ps(bc_mat1_1, vecA_mat2));
+                        sumB_1 = _mm256_add_ps(sumB_1, _mm256_mul_ps(bc_mat1_1, vecB_mat2));
+                    }
+
+                    _mm256_storeu_ps((float*)&result.data[i*N+j], sumA_1);
+                    _mm256_storeu_ps((float*)&result.data[i*N+j + 8], sumB_1);
+                }
+            }
+        }
+    }
+}
+
 template<typename T>
 std::ostream& operator<<(std::ostream& os, const Matrix<T>& mat)
 {
@@ -116,6 +156,25 @@ std::ostream& operator<<(std::ostream& os, const Matrix<T>& mat)
 
     return os;
 }
+
+template<typename T>
+inline bool operator==(const Matrix<T>& lhs, const Matrix<T>& rhs)
+{
+    if (lhs.size != rhs.size) return false;
+
+    for (size_t r = 0; r < lhs.size; r++)
+    {
+        for (size_t c = 0; c < lhs.size; c++)
+        {
+            if (lhs.data[r * lhs.size + c] != rhs.data[r * rhs.size + c]) return false;
+        }
+    }
+
+    return true;
+}
+
+template<typename T>
+inline bool operator!=(const Matrix<T>& lhs, const Matrix<T>& rhs){return !operator==(lhs,rhs);}
 
 int main(int argc, const char** argv)
 {
@@ -149,30 +208,12 @@ int main(int argc, const char** argv)
             mat2.Randomize();
 
             start = system_clock::now();
-            if (bUseSIMD) MultSIMD(mat1, mat2, result);
+            if (bUseSIMD) MultSIMD_Float(mat1, mat2, result);
             else Mult(mat1, mat2, result);
             end = system_clock::now();
 
             duration<double> elapsed_seconds = end - start;
             std::cout << "Float32: " << elapsed_seconds.count() << "s\n";
-        }
-
-        // Float64
-        {
-            Matrix<double> mat1(matrixSize);
-            Matrix<double> mat2(matrixSize);
-            Matrix<double> result(matrixSize);
-
-            mat1.Randomize();
-            mat2.Randomize();
-
-            start = system_clock::now();
-            if (bUseSIMD) MultSIMD(mat1, mat2, result);
-            else Mult(mat1, mat2, result);
-            end = system_clock::now();
-
-            duration<double> elapsed_seconds = end - start;
-            std::cout << "Float64: " << elapsed_seconds.count() << "s\n";
         }
 
         // Int16
@@ -185,48 +226,12 @@ int main(int argc, const char** argv)
             mat2.Randomize();
 
             start = system_clock::now();
-            if (bUseSIMD) MultSIMD(mat1, mat2, result);
+            if (bUseSIMD) MultSIMD_Short(mat1, mat2, result);
             else Mult(mat1, mat2, result);
             end = system_clock::now();
 
             duration<double> elapsed_seconds = end - start;
             std::cout << "Int16: " << elapsed_seconds.count() << "s\n";
-        }
-
-        // Int32
-        {
-            Matrix<int32_t> mat1(matrixSize);
-            Matrix<int32_t> mat2(matrixSize);
-            Matrix<int32_t> result(matrixSize);
-
-            mat1.Randomize();
-            mat2.Randomize();
-
-            start = system_clock::now();
-            if (bUseSIMD) MultSIMD(mat1, mat2, result);
-            else Mult(mat1, mat2, result);
-            end = system_clock::now();
-
-            duration<double> elapsed_seconds = end - start;
-            std::cout << "Int32: " << elapsed_seconds.count() << "s\n";
-        }
-
-        // Int64
-        {
-            Matrix<int64_t> mat1(matrixSize);
-            Matrix<int64_t> mat2(matrixSize);
-            Matrix<int64_t> result(matrixSize);
-
-            mat1.Randomize();
-            mat2.Randomize();
-
-            start = system_clock::now();
-            if (bUseSIMD) MultSIMD(mat1, mat2, result);
-            else Mult(mat1, mat2, result);
-            end = system_clock::now();
-
-            duration<double> elapsed_seconds = end - start;
-            std::cout << "Int64: " << elapsed_seconds.count() << "s\n";
         }
     }
 
