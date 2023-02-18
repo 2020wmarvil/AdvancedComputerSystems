@@ -57,4 +57,4 @@ Int64:   335.092s
 
 #### Analysis
 
-Moving to SIMD provides a massive speed-up, significant even for smaller matrix sizes. Without SIMD, it wasn't even poissible to compute the 10,000x10,000 matrices in a reasonable timeframe.
+Moving to SIMD provides a massive speed-up, significant even for smaller matrix sizes. Without SIMD, it wasn't even poissible to compute the 10,000x10,000 matrices in a reasonable timeframe. There are also some interesting nuances to the data access patterns that allow for better cache coherency than a naive approach. 
