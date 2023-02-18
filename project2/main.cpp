@@ -15,8 +15,8 @@ struct Matrix
     {
         size_t sizeToAlloc = size*size;
 
-        int remainder = sizeToAlloc % 64;
-        if (remainder != 0) sizeToAlloc = sizeToAlloc + 64 - remainder;
+        int remainder = sizeToAlloc % 32;
+        if (remainder != 0) sizeToAlloc = sizeToAlloc + 32 - remainder;
         
         data = (T*)calloc(sizeToAlloc, sizeof(T));
     }
@@ -64,41 +64,59 @@ void Mult(const Matrix<T>& mat1, const Matrix<T>& mat2, Matrix<T>& result)
     }
 }
 
-// Reference: https://codereview.stackexchange.com/questions/177616/avx-simd-in-matrix-multiplication
-template<typename T>
-void MultSIMD_Short(const Matrix<T>& mat1, const Matrix<T>& mat2, Matrix<T>& result)
+void MultSIMD_Short(const Matrix<int16_t>& mat1, const Matrix<int16_t>& mat2, Matrix<int16_t>& result)
 {
     size_t N = mat1.size;
     result.size = N;
 
-    size_t jb = std::min(512u, (uint32_t)N);
-    size_t kb = std::min(24u, (uint32_t)N);
+    __m256i vec_multi = _mm256_setzero_si256();
+    __m256i vec_mat1 = _mm256_setzero_si256();
+    __m256i vec_mat2 = _mm256_setzero_si256();
     
-    for (size_t jj = 0; jj < N; jj += jb) {
-        for (size_t kk = 0; kk < N; kk += kb) {
-            for (size_t i = 0; i < N; i += 1) {
-                for (size_t j = jj; j < jj + jb; j += 16) {
-                    __m256i sumA_1, sumB_1;
-                    if (kk == 0) {
-                        sumA_1 = sumB_1 = _mm256_setzero_si256();
-                    }
-                    else {
-                        sumA_1 = _mm256_load_si256((__m256i*)&result.data[i*N+j]);
-                        sumB_1 = _mm256_load_si256((__m256i*)&result.data[i*N+j + 8]);
-                    }
-
-                    size_t limit = std::min((uint32_t)N, (uint32_t)(kk + kb));
-                    for (size_t k = kk; k < limit; k++) {
-                        auto bc_mat1_1 = _mm256_set1_epi32(mat1.data[i*N+k]);
-                        auto vecA_mat2 = _mm256_loadu_si256((__m256i*)&mat2.data[k*N+j]);
-                        auto vecB_mat2 = _mm256_loadu_si256((__m256i*)&mat2.data[k*N+j + 8]);
-                        sumA_1 = _mm256_add_epi32(sumA_1, _mm256_mullo_epi32(bc_mat1_1, vecA_mat2));
-                        sumB_1 = _mm256_add_epi32(sumB_1, _mm256_mullo_epi32(bc_mat1_1, vecB_mat2));
-                    }
-
-                    _mm256_storeu_si256((__m256i*)&result.data[i*N+j], sumA_1);
-                    _mm256_storeu_si256((__m256i*)&result.data[i*N+j + 8], sumB_1);
-                }
+    for (int i = 0; i < N; i += 16) {
+        for (int j = 0; j < N; ++j) {
+            vec_mat2 = _mm256_set_epi16(
+                mat2.data[(i+0)*N+j], 
+                mat2.data[(i+1)*N+j],
+                mat2.data[(i+2)*N+j],
+                mat2.data[(i+3)*N+j],
+                mat2.data[(i+4)*N+j],
+                mat2.data[(i+5)*N+j],
+                mat2.data[(i+6)*N+j],
+                mat2.data[(i+7)*N+j],
+                mat2.data[(i+8)*N+j], 
+                mat2.data[(i+9)*N+j],
+                mat2.data[(i+10)*N+j],
+                mat2.data[(i+11)*N+j],
+                mat2.data[(i+12)*N+j],
+                mat2.data[(i+13)*N+j],
+                mat2.data[(i+14)*N+j],
+                mat2.data[(i+15)*N+j]
+            );
+    
+            for (int k = 0; k < N; ++k) {
+                vec_mat1 = _mm256_loadu_si256((__m256i*)&mat1.data[k*N+i]);
+                vec_multi = _mm256_add_epi16(vec_multi ,_mm256_mullo_epi16(vec_mat1, vec_mat2));
+    
+                result.data[k*N+j] += 
+                      _mm256_extract_epi16(vec_multi, 0) 
+                    + _mm256_extract_epi16(vec_multi, 1) 
+                    + _mm256_extract_epi16(vec_multi, 2) 
+                    + _mm256_extract_epi16(vec_multi, 3) 
+                    + _mm256_extract_epi16(vec_multi, 4) 
+                    + _mm256_extract_epi16(vec_multi, 5) 
+                    + _mm256_extract_epi16(vec_multi, 6) 
+                    + _mm256_extract_epi16(vec_multi, 7)
+                    + _mm256_extract_epi16(vec_multi, 8) 
+                    + _mm256_extract_epi16(vec_multi, 9) 
+                    + _mm256_extract_epi16(vec_multi, 10) 
+                    + _mm256_extract_epi16(vec_multi, 11) 
+                    + _mm256_extract_epi16(vec_multi, 12) 
+                    + _mm256_extract_epi16(vec_multi, 13) 
+                    + _mm256_extract_epi16(vec_multi, 14) 
+                    + _mm256_extract_epi16(vec_multi, 15);
+    
+                vec_multi = _mm256_setzero_si256();
             }
         }
     }
@@ -196,6 +214,7 @@ int main(int argc, const char** argv)
     using namespace std::chrono;
 
     time_point<system_clock> start, end;
+    duration<double> elapsed_seconds = end - start;
     for (size_t iter = 0; iter < numIterations; iter++)
     {
         // Float32
@@ -203,17 +222,22 @@ int main(int argc, const char** argv)
             Matrix<float> mat1(matrixSize);
             Matrix<float> mat2(matrixSize);
             Matrix<float> result(matrixSize);
+            Matrix<float> resultSIMD(matrixSize);
 
             mat1.Randomize();
             mat2.Randomize();
 
             start = system_clock::now();
-            if (bUseSIMD) MultSIMD_Float(mat1, mat2, result);
-            else Mult(mat1, mat2, result);
+            Mult(mat1, mat2, result);
             end = system_clock::now();
+            elapsed_seconds = end - start;
+            std::cout << "Float32 NonSIMD: " << elapsed_seconds.count() << "s\n";
 
-            duration<double> elapsed_seconds = end - start;
-            std::cout << "Float32: " << elapsed_seconds.count() << "s\n";
+            start = system_clock::now();
+            MultSIMD_Float(mat1, mat2, resultSIMD);
+            end = system_clock::now();
+            elapsed_seconds = end - start;
+            std::cout << "Float32 SIMD: " << elapsed_seconds.count() << "s\n";
         }
 
         // Int16
@@ -221,17 +245,22 @@ int main(int argc, const char** argv)
             Matrix<int16_t> mat1(matrixSize);
             Matrix<int16_t> mat2(matrixSize);
             Matrix<int16_t> result(matrixSize);
+            Matrix<int16_t> resultSIMD(matrixSize);
 
             mat1.Randomize();
             mat2.Randomize();
 
             start = system_clock::now();
-            if (bUseSIMD) MultSIMD_Short(mat1, mat2, result);
-            else Mult(mat1, mat2, result);
+            Mult(mat1, mat2, result);
             end = system_clock::now();
+            elapsed_seconds = end - start;
+            std::cout << "Int16 NonSIMD: " << elapsed_seconds.count() << "s\n";
 
-            duration<double> elapsed_seconds = end - start;
-            std::cout << "Int16: " << elapsed_seconds.count() << "s\n";
+            start = system_clock::now();
+            MultSIMD_Short(mat1, mat2, resultSIMD);
+            end = system_clock::now();
+            elapsed_seconds = end - start;
+            std::cout << "Int16 SIMD: " << elapsed_seconds.count() << "s\n";
         }
     }
 
