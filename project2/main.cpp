@@ -73,32 +73,32 @@ void MultSIMD_Short(const Matrix<int16_t>& mat1, const Matrix<int16_t>& mat2, Ma
     __m256i vec_mat1 = _mm256_setzero_si256();
     __m256i vec_mat2 = _mm256_setzero_si256();
     
-    for (int i = 0; i < N; i += 16) {
-        for (int j = 0; j < N; ++j) {
+    for (int i = 0; i < N; i++) {
+        for (int j = 0; j < N; j+=16) {
             vec_mat2 = _mm256_set_epi16(
-                mat2.data[(i+0)*N+j], 
-                mat2.data[(i+1)*N+j],
-                mat2.data[(i+2)*N+j],
-                mat2.data[(i+3)*N+j],
-                mat2.data[(i+4)*N+j],
-                mat2.data[(i+5)*N+j],
-                mat2.data[(i+6)*N+j],
-                mat2.data[(i+7)*N+j],
-                mat2.data[(i+8)*N+j], 
-                mat2.data[(i+9)*N+j],
-                mat2.data[(i+10)*N+j],
-                mat2.data[(i+11)*N+j],
-                mat2.data[(i+12)*N+j],
-                mat2.data[(i+13)*N+j],
-                mat2.data[(i+14)*N+j],
-                mat2.data[(i+15)*N+j]
+                mat2.data[(i)*N + j+ 0], 
+                mat2.data[(i)*N + j+ 1],
+                mat2.data[(i)*N + j+ 2],
+                mat2.data[(i)*N + j+ 3],
+                mat2.data[(i)*N + j+ 4],
+                mat2.data[(i)*N + j+ 5],
+                mat2.data[(i)*N + j+ 6],
+                mat2.data[(i)*N + j+ 7],
+                mat2.data[(i)*N + j+ 8], 
+                mat2.data[(i)*N + j+ 9],
+                mat2.data[(i)*N + j+10],
+                mat2.data[(i)*N + j+11],
+                mat2.data[(i)*N + j+12],
+                mat2.data[(i)*N + j+13],
+                mat2.data[(i)*N + j+14],
+                mat2.data[(i)*N + j+15]
             );
     
             for (int k = 0; k < N; ++k) {
-                vec_mat1 = _mm256_loadu_si256((__m256i*)&mat1.data[k*N+i]);
+                vec_mat1 = _mm256_loadu_si256((__m256i*)&mat1.data[k*N+j]);
                 vec_multi = _mm256_add_epi16(vec_multi ,_mm256_mullo_epi16(vec_mat1, vec_mat2));
     
-                result.data[k*N+j] += 
+                result.data[k*N+i] += 
                       _mm256_extract_epi16(vec_multi, 0) 
                     + _mm256_extract_epi16(vec_multi, 1) 
                     + _mm256_extract_epi16(vec_multi, 2) 
@@ -127,34 +127,17 @@ void MultSIMD_Float(const Matrix<float>& mat1, const Matrix<float>& mat2, Matrix
     size_t N = mat1.size;
     result.size = N;
 
-    size_t jb = std::min(512u, (uint32_t)N);
-    size_t kb = std::min(24u, (uint32_t)N);
-    
-    for (size_t jj = 0; jj < N; jj += jb) {
-        for (size_t kk = 0; kk < N; kk += kb) {
-            for (size_t i = 0; i < N; i += 1) {
-                for (size_t j = jj; j < jj + jb; j += 16) {
-                    __m256 sumA_1, sumB_1;
-                    if (kk == 0) {
-                        sumA_1 = sumB_1 = _mm256_setzero_ps();
-                    } else {
-                        sumA_1 = _mm256_loadu_ps((float*)&result.data[i*N+j]);
-                        sumB_1 = _mm256_loadu_ps((float*)&result.data[i*N+j + 8]);
-                    }
+    for (size_t i = 0; i < N; ++i) {
+        for (size_t j = 0; j < N - N % 4; j += 4) {
+            __m128 sum = _mm_setzero_ps();
 
-                    size_t limit = std::min((uint32_t)N, (uint32_t)(kk + kb));
-                    for (size_t k = kk; k < limit; k++) {
-                        auto bc_mat1_1 = _mm256_set1_ps(mat1.data[i*N+k]);
-                        auto vecA_mat2 = _mm256_loadu_ps((float*)&mat2.data[k*N+j]);
-                        auto vecB_mat2 = _mm256_loadu_ps((float*)&mat2.data[k*N+j + 8]);
-                        sumA_1 = _mm256_add_ps(sumA_1, _mm256_mul_ps(bc_mat1_1, vecA_mat2));
-                        sumB_1 = _mm256_add_ps(sumB_1, _mm256_mul_ps(bc_mat1_1, vecB_mat2));
-                    }
-
-                    _mm256_storeu_ps((float*)&result.data[i*N+j], sumA_1);
-                    _mm256_storeu_ps((float*)&result.data[i*N+j + 8], sumB_1);
-                }
-            }
+            for (size_t k = 0; k < N; ++k)
+                sum = _mm_add_ps(sum,
+                    _mm_mul_ps(
+                        _mm_set1_ps(mat1.data[i * N + k]),
+                        _mm_loadu_ps(&mat2.data[k * N + j])
+                    ));
+            _mm_storeu_ps(&result.data[i * N + j], sum);
         }
     }
 }
@@ -196,72 +179,68 @@ inline bool operator!=(const Matrix<T>& lhs, const Matrix<T>& rhs){return !opera
 
 int main(int argc, const char** argv)
 {
-    if (argc < 4)
+    if (argc < 2)
     {
         std::cerr << "Wrong arguments. Usage:\n";
-        std::cerr << argv[0] << " [SQUARE_MATRIX_SIZE] [NUM_ITERATIONS] [USE_SIMD]\n";
+        std::cerr << argv[0] << " [SQUARE_MATRIX_SIZE]\n";
         return 1;
     }
 
     std::srand(static_cast<unsigned int>(std::time(nullptr))); 
 
     size_t matrixSize = atoi(argv[1]);
-    size_t numIterations = atoi(argv[2]);
-    size_t bUseSIMD = atoi(argv[3]);
 
-    std::cout << "Performing " << numIterations << " " << matrixSize << "x" << matrixSize << " matrix calculations.\n";
+    std::cout << "Performing " << matrixSize << "x" << matrixSize << " matrix calculations.\n";
 
     using namespace std::chrono;
 
     time_point<system_clock> start, end;
     duration<double> elapsed_seconds = end - start;
-    for (size_t iter = 0; iter < numIterations; iter++)
+
+    // Float32
     {
-        // Float32
-        {
-            Matrix<float> mat1(matrixSize);
-            Matrix<float> mat2(matrixSize);
-            Matrix<float> result(matrixSize);
-            Matrix<float> resultSIMD(matrixSize);
-
-            mat1.Randomize();
-            mat2.Randomize();
-
-            start = system_clock::now();
-            Mult(mat1, mat2, result);
-            end = system_clock::now();
-            elapsed_seconds = end - start;
-            std::cout << "Float32 NonSIMD: " << elapsed_seconds.count() << "s\n";
-
-            start = system_clock::now();
-            MultSIMD_Float(mat1, mat2, resultSIMD);
-            end = system_clock::now();
-            elapsed_seconds = end - start;
-            std::cout << "Float32 SIMD: " << elapsed_seconds.count() << "s\n";
-        }
-
-        // Int16
-        {
-            Matrix<int16_t> mat1(matrixSize);
-            Matrix<int16_t> mat2(matrixSize);
-            Matrix<int16_t> result(matrixSize);
-            Matrix<int16_t> resultSIMD(matrixSize);
-
-            mat1.Randomize();
-            mat2.Randomize();
-
-            start = system_clock::now();
-            Mult(mat1, mat2, result);
-            end = system_clock::now();
-            elapsed_seconds = end - start;
-            std::cout << "Int16 NonSIMD: " << elapsed_seconds.count() << "s\n";
-
-            start = system_clock::now();
-            MultSIMD_Short(mat1, mat2, resultSIMD);
-            end = system_clock::now();
-            elapsed_seconds = end - start;
-            std::cout << "Int16 SIMD: " << elapsed_seconds.count() << "s\n";
-        }
+        Matrix<float> mat1(matrixSize);
+        Matrix<float> mat2(matrixSize);
+        Matrix<float> result(matrixSize);
+        Matrix<float> resultSIMD(matrixSize);
+    
+        mat1.Randomize();
+        mat2.Randomize();
+    
+        start = system_clock::now();
+        Mult(mat1, mat2, result);
+        end = system_clock::now();
+        elapsed_seconds = end - start;
+        std::cout << "Float32 NonSIMD: " << elapsed_seconds.count() << "s\n";
+    
+        start = system_clock::now();
+        MultSIMD_Float(mat1, mat2, resultSIMD);
+        end = system_clock::now();
+        elapsed_seconds = end - start;
+        std::cout << "Float32 SIMD: " << elapsed_seconds.count() << "s\n";
+    }
+    
+    // Int16
+    {
+        Matrix<int16_t> mat1(matrixSize);
+        Matrix<int16_t> mat2(matrixSize);
+        Matrix<int16_t> result(matrixSize);
+        Matrix<int16_t> resultSIMD(matrixSize);
+    
+        mat1.Randomize();
+        mat2.Randomize();
+    
+        start = system_clock::now();
+        Mult(mat1, mat2, result);
+        end = system_clock::now();
+        elapsed_seconds = end - start;
+        std::cout << "Int16 NonSIMD: " << elapsed_seconds.count() << "s\n";
+    
+        start = system_clock::now();
+        MultSIMD_Short(mat1, mat2, resultSIMD);
+        end = system_clock::now();
+        elapsed_seconds = end - start;
+        std::cout << "Int16 SIMD: " << elapsed_seconds.count() << "s\n";
     }
 
     return 0;
