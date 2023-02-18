@@ -13,12 +13,12 @@ $ make
 
 Template:
 ```
-$ ./ACS_Proj2 <square_matrix_size> <num_iterations> <use_simd?>
+$ ./ACS_Proj2 <square_matrix_size> <use_simd?>
 ```
 
-Run 1 iteration of 1000x1000 with SIMD enabled:
+Run 1000x1000 mult with SIMD enabled:
 ```
-$ ./ACS_Proj2 1000 1 1
+$ ./ACS_Proj2 1000 1
 ```
 
 #### Benchmarking Test
@@ -26,33 +26,23 @@ $ ./ACS_Proj2 1000 1 1
 These measurements are taken on a 12-core Intel i7-10850H @ 2.70GHz.
 
 ```
-- 1,000x1,000, Non-SIMD -
-Float32: 1.79538s
-Float64: 1.79116s
-Int16:   1.47309s
-Int32:   1.42196s
-Int64:   1.5387s
+Performing 100x100 matrix calculations.
+Float32 NonSIMD: 0.0002668s
+Float32 SIMD: 7.69e-05s
+Int16 NonSIMD: 0.000256s
+Int16 SIMD: 0.0003113s
 
-- 10,000x10,000, Non-SIMD -
-Float32: DNF
-Float64: DNF
-Int16:   DNF
-Int32:   DNF
-Int64:   DNF
+Performing 1000x1000 matrix calculations.
+Float32 NonSIMD: 0.431881s
+Float32 SIMD: 0.137632s
+Int16 NonSIMD: 0.367756s
+Int16 SIMD: 0.32713s
 
-- 1,000x1,000, SIMD -
-Float32: 0.309114s
-Float64: 0.331586s
-Int16:   0.262672s
-Int32:   0.308254s
-Int64:   0.314862s
-
-- 10,000x10,000, SIMD -
-Float32: 302.742s
-Float64: 347s
-Int16:   266.227s
-Int32:   305.474s
-Int64:   335.092s
+Performing 10,000x10,000 matrix calculations.
+Float32 NonSIMD: DNF
+Float32 SIMD: 1307.85s
+Int16 NonSIMD: DNF
+Int16 SIMD: 1678.37s
 ```
 
 #### Analysis
