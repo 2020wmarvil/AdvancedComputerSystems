@@ -179,16 +179,17 @@ inline bool operator!=(const Matrix<T>& lhs, const Matrix<T>& rhs){return !opera
 
 int main(int argc, const char** argv)
 {
-    if (argc < 2)
+    if (argc < 3)
     {
         std::cerr << "Wrong arguments. Usage:\n";
-        std::cerr << argv[0] << " [SQUARE_MATRIX_SIZE]\n";
+        std::cerr << argv[0] << " [SQUARE_MATRIX_SIZE] [USE_SIMD?]\n";
         return 1;
     }
 
     std::srand(static_cast<unsigned int>(std::time(nullptr))); 
 
     size_t matrixSize = atoi(argv[1]);
+    size_t useSIMD = atoi(argv[2]);
 
     std::cout << "Performing " << matrixSize << "x" << matrixSize << " matrix calculations.\n";
 
@@ -207,17 +208,21 @@ int main(int argc, const char** argv)
         mat1.Randomize();
         mat2.Randomize();
     
-        start = system_clock::now();
-        Mult(mat1, mat2, result);
-        end = system_clock::now();
-        elapsed_seconds = end - start;
-        std::cout << "Float32 NonSIMD: " << elapsed_seconds.count() << "s\n";
-    
-        start = system_clock::now();
-        MultSIMD_Float(mat1, mat2, resultSIMD);
-        end = system_clock::now();
-        elapsed_seconds = end - start;
-        std::cout << "Float32 SIMD: " << elapsed_seconds.count() << "s\n";
+        if (useSIMD)
+        {
+            start = system_clock::now();
+            MultSIMD_Float(mat1, mat2, resultSIMD);
+            end = system_clock::now();
+            elapsed_seconds = end - start;
+            std::cout << "Float32 SIMD: " << elapsed_seconds.count() << "s\n";
+        }
+        else {
+            start = system_clock::now();
+            Mult(mat1, mat2, result);
+            end = system_clock::now();
+            elapsed_seconds = end - start;
+            std::cout << "Float32 NonSIMD: " << elapsed_seconds.count() << "s\n";
+        }
     }
     
     // Int16
@@ -228,19 +233,23 @@ int main(int argc, const char** argv)
         Matrix<int16_t> resultSIMD(matrixSize);
     
         mat1.Randomize();
-        mat2.Randomize();
-    
-        start = system_clock::now();
-        Mult(mat1, mat2, result);
-        end = system_clock::now();
-        elapsed_seconds = end - start;
-        std::cout << "Int16 NonSIMD: " << elapsed_seconds.count() << "s\n";
-    
-        start = system_clock::now();
-        MultSIMD_Short(mat1, mat2, resultSIMD);
-        end = system_clock::now();
-        elapsed_seconds = end - start;
-        std::cout << "Int16 SIMD: " << elapsed_seconds.count() << "s\n";
+        mat2.Randomize();  
+
+        if (useSIMD)
+        {
+            start = system_clock::now();
+            MultSIMD_Short(mat1, mat2, resultSIMD);
+            end = system_clock::now();
+            elapsed_seconds = end - start;
+            std::cout << "Int16 SIMD: " << elapsed_seconds.count() << "s\n";
+        }
+        else {
+            start = system_clock::now();
+            Mult(mat1, mat2, result);
+            end = system_clock::now();
+            elapsed_seconds = end - start;
+            std::cout << "Int16 NonSIMD: " << elapsed_seconds.count() << "s\n";
+        }
     }
 
     return 0;
