@@ -3,8 +3,11 @@
 #### Environment
 
 OS: Ubuntu 20.04
+
 CPU: Intel(R) Core(TM) i7-10850H CPU @ 2.70 GHz (12 cores)
+
 Memory: 2x16 GiB SODIMM DDR4 @ 3200 MHz (Samsung M471A2K43DB1-CWE)
+
 Storage: 512 GiB NVMe SSD @ 33 MHz (Samsung MZVLB512HBJQ-000L7)
 
 #### Memory Experiments
