@@ -9,13 +9,11 @@
 
 #### Memory Experiments
 
-Variables:
 - read/write intensity (read only, write only, 70/30)
 - data access size (64B/256B)
 
 #### Storage Experiments
 
-Variables:
 - read/write intensity (read only, write only, 70/30)
 - data access size (4KB/32KB/128KB)
 
