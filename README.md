@@ -8,4 +8,4 @@
 
 ## Project 4: [Implementation of Dictionary Codec](https://github.com/2020wmarvil/AdvancedComputerSystems/tree/main/project4)
 
-## Final Project:
+## Final Project: [SIMD Enabled DSP Library](https://github.com/HisenZhang/AdvancedComputerSystem)
